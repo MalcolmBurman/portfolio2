@@ -1,14 +1,7 @@
 import Container from "./container";
 import HeroScene from "../../scenes/heroScene.jsx";
 import { Button } from "./button";
-import {
-  MapPin,
-  CodeXml,
-  Globe,
-  Layers,
-  PencilRuler,
-  Leaf,
-} from "lucide-react";
+import { MapPin, CodeXml, Globe, Layers, Leaf, FolderGit2 } from "lucide-react";
 
 export default function Hero() {
   return (
@@ -41,7 +34,7 @@ export default function Hero() {
             variant="outline"
             className="px-4 py-6  border-2 border-emerald-700"
           >
-            <CodeXml className="size-6 text-emerald-700" />
+            <FolderGit2 className="size-6 text-emerald-700" />
             <p className="text-base text-emerald-700 px-2">VIEW MY CODE</p>
           </Button>
         </div>
@@ -64,7 +57,7 @@ export default function Hero() {
             </p>
           </div>
           <div className="max-w-xs">
-            <PencilRuler
+            <CodeXml
               strokeWidth={1}
               className="size-20 text-emerald-700 mb-2"
             />
