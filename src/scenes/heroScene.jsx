@@ -8,15 +8,6 @@ import * as THREE from "three";
 import { OrbitControls, Line } from "@react-three/drei";
 import { Button } from "../components/ui/button";
 import { PencilSparkles } from "lucide-react";
-import {
-  EffectComposer,
-  Bloom,
-  ChromaticAberration,
-  Noise,
-  Vignette,
-  Scanline,
-} from "@react-three/postprocessing";
-import { ScanlineEffect } from "postprocessing";
 
 const width = 10;
 const depth = 10;
@@ -133,7 +124,8 @@ function generateBuildings(
     count = 30,
     area = 9, // spread across roughly the terrain width
     minHeight = 0.3,
-    maxHeight = 3,
+    maxHeight = 3.5,
+    densityScalar = 0.4,
   } = {},
 ) {
   const buildings = [];
@@ -145,7 +137,7 @@ function generateBuildings(
     const z = (Math.random() - 0.5) * area;
 
     // use noise to cluster buildings like settlements instead of pure random scatter
-    const density = noise2D(x * 0.4, z * 0.3);
+    const density = noise2D(x * densityScalar, z * 0.3);
     if (density < 0.1) continue; // skip "empty" areas, creates natural clustering
 
     const height = minHeight + Math.random() * (maxHeight - minHeight);
@@ -312,10 +304,14 @@ function Terrain({ noise2D }) {
   return (
     <>
       <mesh geometry={geometry}>
-        <meshBasicMaterial color="#fffff3" />
+        <meshBasicMaterial color="#fffff3" side={THREE.DoubleSide} />
       </mesh>
 
-      <mesh geometry={geometry} position={[0, 0.01, 0]}>
+      <mesh geometry={geometry} position={[0, 0.003, 0]}>
+        <meshBasicMaterial color="#555555" wireframe />
+      </mesh>
+
+      <mesh geometry={geometry} position={[0, -0.001, 0]}>
         <meshBasicMaterial color="#555555" wireframe />
       </mesh>
     </>
@@ -409,7 +405,11 @@ function TrafficParticles({ roads, particlesPerRoad = 2 }) {
     /* 5e8fea*/
   }
   return (
-    <instancedMesh ref={meshRef} args={[null, null, particles.length]}>
+    <instancedMesh
+      ref={meshRef}
+      args={[null, null, particles.length]}
+      position={[0, 0.08, 0]}
+    >
       <sphereGeometry args={[1, 8, 8]} />
       <meshBasicMaterial color="#71cfab" toneMapped={false} />
     </instancedMesh>
@@ -463,6 +463,7 @@ function Roads({ roads, color = "#3e78ce", maxOpacity = 0.9 }) {
           dashScale={2}
           dashSize={0.4}
           gapSize={0.6}
+          position={[0, 0.05, 0]}
         />
       ))}
     </>
@@ -472,9 +473,25 @@ function Roads({ roads, color = "#3e78ce", maxOpacity = 0.9 }) {
 function SceneContent() {
   const noise2D = useMemo(() => createNoise2D(), []);
 
-  const buildings = useMemo(() => generateBuildings(noise2D), [noise2D]);
+  const buildingCount = useMemo(
+    () => Math.floor(2 + Math.random() * 60), // 30–90 buildings
+    [],
+  );
+  const densityScalar = useMemo(
+    () => Math.floor(Math.random() * 0.6 + 0.1),
+    [],
+  );
+  const roadCount = useMemo(
+    () => Math.floor(4 + Math.random() * 7), // 8–20 roads
+    [],
+  );
+
+  const buildings = useMemo(
+    () => generateBuildings(noise2D, { count: buildingCount }),
+    [noise2D],
+  );
   const roads = useMemo(
-    () => generateRoads(buildings, noise2D),
+    () => generateRoads(buildings, noise2D, { roadCount: roadCount }),
     [buildings, noise2D],
   );
 
@@ -522,18 +539,9 @@ export default function HeroScene() {
           <color attach="background" args={[0xfffff3]} />
           <Controls />
           <CameraOffset />
-          <ambientLight intensity={1} />
           <RotatingScene>
             <SceneContent key={seed} />
           </RotatingScene>
-          <EffectComposer>
-            <Bloom
-              intensity={0.9}
-              luminanceThreshold={0.5}
-              luminanceSmoothing={3}
-            />
-            <Scanline />
-          </EffectComposer>
         </Canvas>
         <Button
           variant="outline"

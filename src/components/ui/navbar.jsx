@@ -12,7 +12,7 @@ export default function Navbar() {
             </p>
           </div>
 
-          <div className="flex items-center gap-15 text-lg">
+          <div className="flex items-center gap-15 text-lg pointer-events-auto">
             <a
               href="#projects"
               className="hover:text-emerald-600 transition-colors"
