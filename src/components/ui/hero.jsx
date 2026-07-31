@@ -2,17 +2,35 @@ import Container from "./container";
 import HeroScene from "../../scenes/heroScene.jsx";
 import { Button } from "./button";
 import { MapPin, CodeXml, Globe, Layers, Leaf, FolderGit2 } from "lucide-react";
+import TypeWriter from "../kokonutui/type-writer.jsx";
 
 export default function Hero() {
   return (
-    <Container className="pointer-events-none">
-      {/* className="py-16 md:py-24" <span className="font-mono text-sm">59.6749° N, 17.1413° E</span> */}
-      <div className="hero-text px-5 pt-74 ">
-        <div className="hero-text-large font-mono text-7xl ">
+    <Container className="pointer-events-none relative h-full min-h-screen overflow-hidden">
+      {/* className="py-16 md:py-24" */}
+      <div id="home" className="hero-text lg:px-5 pt-35 lg:pt-[25vh] ">
+        <div className="hero-text-large  font-mono text-5xl lg:text-7xl ">
           <p>
             Turning Spatial <br></br> Data Into
           </p>
-          <p className="text-emerald-700">Real-World Impact.</p>
+          <div className="w-full text-left">
+            <TypeWriter
+              sequences={[
+                { text: "Real-World Impact.", deleteAfter: true },
+                { text: "Interactive Maps.", deleteAfter: true },
+                { text: "Geospatial Intelligence.", deleteAfter: true },
+                { text: "Smarter Decisions.", deleteAfter: true },
+                { text: "An Earth Sandwich?", deleteAfter: true },
+                { text: "Digital Landscapes.", deleteAfter: true },
+                { text: "Environmental Insights.", deleteAfter: true },
+                { text: "3D Experiences.", deleteAfter: true },
+                { text: "Insights From Above.", deleteAfter: true },
+                { text: "Something New.", deleteAfter: true },
+              ]}
+              typingSpeed={60}
+              loopDelay={0}
+            />
+          </div>
         </div>
         <div className="hero-text-small text-lg pt-7">
           <p>
@@ -25,10 +43,12 @@ export default function Hero() {
         <div className="pt-7 pointer-events-auto w-fit">
           <Button
             variant="default"
-            className="px-4 py-6 bg-linear-[150deg] from-emerald-700 to-emerald-500 hover:to-emerald-600  mr-3"
+            className="px-4 py-6 bg-linear-[150deg] from-emerald-700 to-emerald-500 hover:to-emerald-600  mr-3 sm:mb-3"
           >
-            <MapPin className="size-6" />
-            <p className="text-base px-2">EXPLORE PROJECTS</p>
+            <a className="flex" href="#projects">
+              <MapPin className="size-6" />
+              <p className="text-base px-2">EXPLORE PROJECTS</p>
+            </a>
           </Button>
           <Button
             variant="outline"
@@ -39,9 +59,12 @@ export default function Hero() {
           </Button>
         </div>
 
-        <div className=" pt-25 flex flex-row gap-15">
+        <div className=" pt-[5vh] lg:pt-25 grid lg:flex grid-cols-2 gap-8 lg:grid-cols-4 lg:gap-15">
           <div className="max-w-xs">
-            <Globe strokeWidth={1} className="size-20 text-emerald-700 mb-2" />
+            <Globe
+              strokeWidth={1}
+              className="size-15 lg:size-20 text-emerald-700 mb-2"
+            />
             <p className="font-bold text-lg">GEOSPATIAL ANALYSIS</p>
             <p className="text-stone-600">
               Working with spatial data, <br></br> remote sensing and <br></br>
@@ -49,7 +72,10 @@ export default function Hero() {
             </p>
           </div>
           <div className="max-w-xs">
-            <Layers strokeWidth={1} className="size-20 text-emerald-700 mb-2" />
+            <Layers
+              strokeWidth={1}
+              className="size-15 lg:size-20 text-emerald-700 mb-2"
+            />
             <p className="font-bold text-lg">MAPS & VISUALIZATION</p>
             <p className="text-stone-600">
               Creating interactive maps <br></br> and visual experiences
@@ -59,7 +85,7 @@ export default function Hero() {
           <div className="max-w-xs">
             <CodeXml
               strokeWidth={1}
-              className="size-20 text-emerald-700 mb-2"
+              className="size-15 lg:size-20 text-emerald-700 mb-2"
             />
             <p className="font-bold text-lg">SOFTWARE DEVELOPMENT</p>
             <p className="text-stone-600">
@@ -68,9 +94,12 @@ export default function Hero() {
             </p>
           </div>
           <div className="max-w-xs">
-            <Leaf strokeWidth={1} className="size-20 text-emerald-700 mb-2" />
+            <Leaf
+              strokeWidth={1}
+              className="size-15 lg:size-20 text-emerald-700 mb-2 "
+            />
             <p className="font-bold text-lg">SUSTAINABLE FUTURE</p>
-            <p className="text-stone-600 pb-400">
+            <p className="text-stone-600 ">
               Using geospatial insights <br></br> to support sustainable
               <br></br> planning and informed <br></br> decisions.
             </p>
@@ -78,7 +107,7 @@ export default function Hero() {
         </div>
       </div>
 
-      <div className="absolute inset-0 -z-10 ">
+      <div className="lg:absolute inset-0 -z-10 overflow-auto">
         <HeroScene />
       </div>
     </Container>

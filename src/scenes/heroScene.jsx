@@ -523,29 +523,45 @@ function RotatingScene({ children }) {
 
 export default function HeroScene() {
   const [seed, setSeed] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 639px)");
+
+    const update = () => setIsMobile(media.matches);
+
+    update();
+    media.addEventListener("change", update);
+
+    return () => media.removeEventListener("change", update);
+  }, []);
   return (
     <Container>
-      <div id="canvas-container" className="relative">
-        <Canvas
-          style={{ width: "100%", height: "100vh" }}
-          camera={{
-            position: [0, 2, 40],
-            fov: 20,
-          }}
-          gl={{
-            toneMapping: THREE.NoToneMapping,
-          }}
-        >
-          <color attach="background" args={[0xfffff3]} />
-          <Controls />
-          <CameraOffset />
-          <RotatingScene>
-            <SceneContent key={seed} />
-          </RotatingScene>
-        </Canvas>
+      <div
+        id="canvas-container"
+        className="relative w-full lg:h-screen h-[55vh] mt-10 lg:mt-0"
+      >
+        <div className="h-[40vh] lg:h-screen w-full">
+          <Canvas
+            camera={{
+              position: isMobile ? [0, 4, 40] : [0, 2, 40],
+              fov: isMobile ? 10 : 20,
+            }}
+            gl={{
+              toneMapping: THREE.NoToneMapping,
+            }}
+          >
+            <color attach="background" args={[0xfffff3]} />
+            {!isMobile && <Controls />}
+            {!isMobile && <CameraOffset />}
+            <RotatingScene>
+              <SceneContent key={seed} />
+            </RotatingScene>
+          </Canvas>
+        </div>
         <Button
           variant="outline"
-          className=" absolute top-245 right-0 w-fit px-4 py-6  pointer-events-auto border-2 border-emerald-700"
+          className="absolute mt-5 lg:mt-0 lg:top-[75vh] w-full lg:left-auto lg:right-0 lg:w-fit px-4 py-6 pointer-events-auto border-2 border-emerald-700"
           onClick={() => setSeed((s) => s + 1)}
         >
           <PencilSparkles className="size-6 text-emerald-700" />
