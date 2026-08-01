@@ -1,7 +1,14 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { SphereGeometry } from "three";
 import { backgroundBlurriness } from "three/src/nodes/TSL.js";
-import { useRef, useMemo, useEffect, useState } from "react";
+import {
+  createContext,
+  useRef,
+  useMemo,
+  useEffect,
+  useState,
+  useContext,
+} from "react";
 import Container from "../components/ui/container";
 import { createNoise2D } from "simplex-noise";
 import * as THREE from "three";
@@ -9,9 +16,44 @@ import { OrbitControls, Line } from "@react-three/drei";
 import { Button } from "../components/ui/button";
 import { PencilSparkles } from "lucide-react";
 
+const CityTimeContext = createContext(null);
+
 const width = 10;
 const depth = 10;
 const heightScale = 0.7;
+
+function CityController({
+  phase,
+  onReverseComplete,
+  reverseDuration = 2.5,
+  children,
+}) {
+  const virtualTime = useRef(0);
+  const ambientTime = useRef(0);
+
+  useFrame((state, delta) => {
+    ambientTime.current += delta;
+
+    if (phase === "building") {
+      virtualTime.current = Math.min(virtualTime.current + delta, 4);
+    } else if (phase === "reversing") {
+      const reverseSpeed = 6 / reverseDuration;
+
+      virtualTime.current -= delta * reverseSpeed;
+
+      if (virtualTime.current <= 0) {
+        virtualTime.current = 0;
+        onReverseComplete();
+      }
+    }
+  });
+
+  return (
+    <CityTimeContext.Provider value={{ virtualTime, ambientTime, phase }}>
+      {children}
+    </CityTimeContext.Provider>
+  );
+}
 
 function Controls() {
   const controls = useRef();
@@ -125,7 +167,8 @@ function generateBuildings(
     area = 9, // spread across roughly the terrain width
     minHeight = 0.3,
     maxHeight = 3.5,
-    densityScalar = 0.4,
+    densityScalarX = 0.4,
+    densityScalarZ = 0.3,
   } = {},
 ) {
   const buildings = [];
@@ -137,7 +180,7 @@ function generateBuildings(
     const z = (Math.random() - 0.5) * area;
 
     // use noise to cluster buildings like settlements instead of pure random scatter
-    const density = noise2D(x * densityScalar, z * 0.3);
+    const density = noise2D(x * densityScalarX, z * densityScalarZ);
     if (density < 0.1) continue; // skip "empty" areas, creates natural clustering
 
     const height = minHeight + Math.random() * (maxHeight - minHeight);
@@ -153,7 +196,7 @@ function generateBuildings(
 function Buildings({ buildings, noise2D }) {
   const meshRef = useRef();
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const startTime = useRef(performance.now());
+  const { virtualTime } = useContext(CityTimeContext);
 
   const opacityArray = useMemo(
     () => new Float32Array(buildings.length),
@@ -172,10 +215,10 @@ function Buildings({ buildings, noise2D }) {
   useFrame(() => {
     if (!meshRef.current) return;
 
-    const elapsed = (performance.now() - startTime.current) / 1000;
+    const elapsed = virtualTime.current;
 
     buildings.forEach((b, i) => {
-      const growStart = 1.5 + b.delay;
+      const growStart = 0.3 + b.delay;
       const growDuration = 0.6;
 
       const t = THREE.MathUtils.clamp(
@@ -258,7 +301,7 @@ function Buildings({ buildings, noise2D }) {
 
 function Terrain({ noise2D }) {
   const meshRef = useRef();
-  const startTime = useRef(null);
+  const { virtualTime } = useContext(CityTimeContext);
 
   const { geometry, targetHeights } = useMemo(() => {
     const { positions, indices } = generateTerrainGeometry(noise2D);
@@ -282,13 +325,13 @@ function Terrain({ noise2D }) {
   }, [noise2D]);
 
   useFrame((state) => {
-    if (startTime.current === null)
-      startTime.current = state.clock.elapsedTime + 0.5;
-    const elapsed = state.clock.elapsedTime - startTime.current;
+    if (virtualTime.current === null)
+      virtualTime.current = state.clock.elapsedTime + 0.5;
+    const elapsed = virtualTime.current;
 
     const duration = 1.5;
     const t = THREE.MathUtils.clamp(elapsed / duration, 0, 1);
-    const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+    const eased = 1 - Math.pow(1 - t, 2); // ease-out cubic
 
     const posAttr = geometry.attributes.position;
     for (let i = 0; i < targetHeights.length; i++) {
@@ -360,7 +403,7 @@ function generateRoads(
 function TrafficParticles({ roads, particlesPerRoad = 2 }) {
   const meshRef = useRef();
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const startTime = useRef(null);
+  const { virtualTime, ambientTime, phase } = useContext(CityTimeContext);
 
   const particles = useMemo(() => {
     const list = [];
@@ -368,10 +411,11 @@ function TrafficParticles({ roads, particlesPerRoad = 2 }) {
       for (let i = 0; i < particlesPerRoad; i++) {
         list.push({
           roadIndex,
-          offset: 0, // always start at the road's beginning (a building)
-          speed: 0.05 + Math.random() * 0.2,
-          startDelay: 2.2 + Math.random() * 2, // staggered "leave the house" times
-          started: false,
+          startDelay: 2.2 + Math.random() * 2, // gates on virtualTime — part of the reveal
+          cycleOffset: Math.random() * 10, // randomizes each particle's position within the ambient cycle
+          travelDuration: 3 + Math.random() * 2,
+          pauseDuration: 1 + Math.random() * 2,
+          fadeScale: 1,
         });
       }
     });
@@ -380,30 +424,49 @@ function TrafficParticles({ roads, particlesPerRoad = 2 }) {
 
   useFrame((state, delta) => {
     if (!meshRef.current) return;
-    if (startTime.current === null) startTime.current = state.clock.elapsedTime;
-    const elapsed = state.clock.elapsedTime - startTime.current;
+    const fadeSpeed = 3;
 
     particles.forEach((p, i) => {
-      const active = elapsed > p.startDelay;
+      const cycleDuration = p.travelDuration + p.pauseDuration;
+      const localTime = (ambientTime.current + p.cycleOffset) % cycleDuration;
+      const currentlyTraveling = localTime < p.travelDuration;
+      const offset = currentlyTraveling ? localTime / p.travelDuration : 0;
 
-      if (active) {
-        p.offset = (p.offset + p.speed * delta) % 1;
+      // hasn't been "revealed" yet by the intro sequence
+      const revealed = virtualTime.current > p.startDelay;
+
+      let visible = false;
+      let renderOffset = offset;
+
+      if (phase === "reversing") {
+        if (p.frozenOffset === undefined) {
+          p.frozenOffset = currentlyTraveling && revealed ? offset : null;
+        }
+        p.fadeScale = Math.max(0, p.fadeScale - delta * fadeSpeed);
+
+        if (p.frozenOffset !== null) {
+          renderOffset = p.frozenOffset;
+          visible = p.fadeScale > 0;
+        }
+      } else {
+        p.fadeScale = 1;
+        p.frozenOffset = undefined;
+        visible = currentlyTraveling && revealed;
       }
 
-      const curve = roads[p.roadIndex];
-      const point = curve.getPointAt(p.offset);
-
-      dummy.position.copy(point);
-      dummy.scale.setScalar(active ? 0.08 : 0); // invisible until it "leaves"
+      if (visible) {
+        const point = roads[p.roadIndex].getPointAt(renderOffset);
+        dummy.position.copy(point);
+        dummy.scale.setScalar(0.08 * p.fadeScale);
+      } else {
+        dummy.scale.setScalar(0);
+      }
       dummy.updateMatrix();
       meshRef.current.setMatrixAt(i, dummy.matrix);
     });
     meshRef.current.instanceMatrix.needsUpdate = true;
   });
 
-  {
-    /* 5e8fea*/
-  }
   return (
     <instancedMesh
       ref={meshRef}
@@ -415,13 +478,12 @@ function TrafficParticles({ roads, particlesPerRoad = 2 }) {
     </instancedMesh>
   );
 }
-
 {
   /*2dd4a2*/
 }
-function Roads({ roads, color = "#3e78ce", maxOpacity = 0.9 }) {
+function Roads({ roads, color = "#3e78ce", maxOpacity = 0.8 }) {
   const lineRefs = useRef([]);
-  const startTime = useRef(null);
+  const { virtualTime, ambientTime } = useContext(CityTimeContext);
 
   const roadPoints = useMemo(
     () => roads.map((curve) => curve.getPoints(50)),
@@ -432,10 +494,9 @@ function Roads({ roads, color = "#3e78ce", maxOpacity = 0.9 }) {
     [roads],
   );
 
-  useFrame((state) => {
-    if (startTime.current === null) startTime.current = state.clock.elapsedTime;
-    const elapsed = state.clock.elapsedTime - startTime.current;
-    const fadeDuration = 0.8;
+  useFrame(() => {
+    const elapsed = virtualTime.current;
+    const fadeDuration = 0.4;
 
     lineRefs.current.forEach((line, i) => {
       if (!line) return;
@@ -443,8 +504,8 @@ function Roads({ roads, color = "#3e78ce", maxOpacity = 0.9 }) {
       const t = Math.min(Math.max((elapsed - delays[i]) / fadeDuration, 0), 1);
       line.material.opacity = t * maxOpacity;
 
-      // animate dash offset to create a traveling pulse along the road
-      line.material.uniforms.dashOffset.value -= 0.005;
+      // pulse is driven by ambientTime, so it keeps flowing smoothly no matter what virtualTime does
+      line.material.uniforms.dashOffset.value = -ambientTime.current * 0.5;
     });
   });
 
@@ -477,17 +538,28 @@ function SceneContent() {
     () => Math.floor(2 + Math.random() * 60), // 30–90 buildings
     [],
   );
-  const densityScalar = useMemo(
-    () => Math.floor(Math.random() * 0.6 + 0.1),
+  const densityScalarX = useMemo(
+    () => (Math.floor(Math.random() * 6) + 1) / 10,
     [],
   );
+
+  const densityScalarZ = useMemo(
+    () => (Math.floor(Math.random() * 6) + 1) / 10,
+    [],
+  );
+
   const roadCount = useMemo(
     () => Math.floor(4 + Math.random() * 7), // 8–20 roads
     [],
   );
 
   const buildings = useMemo(
-    () => generateBuildings(noise2D, { count: buildingCount }),
+    () =>
+      generateBuildings(noise2D, {
+        count: buildingCount,
+        densityScalarX: densityScalarX,
+        densityScalarZ: densityScalarZ,
+      }),
     [noise2D],
   );
   const roads = useMemo(
@@ -523,7 +595,13 @@ function RotatingScene({ children }) {
 
 export default function HeroScene() {
   const [seed, setSeed] = useState(0);
+  const [phase, setPhase] = useState("building");
   const [isMobile, setIsMobile] = useState(false);
+
+  const handleReverseComplete = () => {
+    setSeed((s) => s + 1); // now randomize
+    setPhase("building"); // and play forward again
+  };
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 639px)");
@@ -555,14 +633,19 @@ export default function HeroScene() {
             {!isMobile && <Controls />}
             {!isMobile && <CameraOffset />}
             <RotatingScene>
-              <SceneContent key={seed} />
+              <CityController
+                phase={phase}
+                onReverseComplete={handleReverseComplete}
+              >
+                <SceneContent key={seed} />
+              </CityController>
             </RotatingScene>
           </Canvas>
         </div>
         <Button
           variant="outline"
           className="absolute mt-5 lg:mt-0 lg:top-[75vh] w-full lg:left-auto lg:right-0 lg:w-fit px-4 py-6 pointer-events-auto border-2 border-emerald-700"
-          onClick={() => setSeed((s) => s + 1)}
+          onClick={() => setPhase("reversing")}
         >
           <PencilSparkles className="size-6 text-emerald-700" />
           <p className="text-base text-emerald-700 px-2">BUILD A NEW CITY!</p>
